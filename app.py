@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -41,8 +42,23 @@ def main():
 
     @st.cache_data
     def load_data():
-        df_train = pd.read_csv(r"data\data_train.csv")
-        df_test = pd.read_csv(r"data\data_test.csv")
+    # path lokal
+        local_train = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_train.csv"
+        local_test = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_test.csv"
+        
+        # path di GitHub/Streamlit Cloud
+        repo_train = os.path.join("data", "data_train.csv")
+        repo_test = os.path.join("data", "data_test.csv")
+        
+        # cek apakah file lokal ada, kalau tidak, gunakan versi repo
+        if os.path.exists(local_train):
+            df_train = pd.read_csv(local_train)
+            df_test = pd.read_csv(local_test)
+            print("📂 Menggunakan data dari lokal")
+        else:
+            df_train = pd.read_csv(repo_train)
+            df_test = pd.read_csv(repo_test)
+            print("☁️ Menggunakan data dari GitHub/Streamlit Cloud")
 
         drop_cols = ['Pasar Rongtengah', 'Pasar Srimangunan', ' Pasar Rongtengah', ' Pasar Srimangunan']
         df_train = df_train.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga'})
