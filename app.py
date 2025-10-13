@@ -41,8 +41,8 @@ def main():
 
     @st.cache_data
     def load_data():
-        df_train = pd.read_csv(r"data\data_train.csv")
-        df_test = pd.read_csv(r"data\data_test.csv")
+        df_train = pd.read_csv(r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_train.csv")
+        df_test = pd.read_csv(r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_test.csv")
 
         drop_cols = ['Pasar Rongtengah', 'Pasar Srimangunan', ' Pasar Rongtengah', ' Pasar Srimangunan']
         df_train = df_train.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga'})
