@@ -1,4 +1,4 @@
-# 🌾 Dashboard Prediksi Harga Jagung Menggunakan SVR, Random Forest, dan TwinSVR
+# 🌾 Dashboard Prediksi Harga Jagung Menggunakan TSVR, SVR, dan Random Forest
 
 Aplikasi ini dikembangkan menggunakan **Streamlit** untuk menampilkan hasil prediksi harga jagung berdasarkan model **Twin Support Vector Regression (TSVR)**, **Support Vector Regression (SVR)**, dan **Random Forest Regression (RFR)**.  
 Tujuan utama aplikasi ini adalah untuk membantu analisis dan visualisasi performa model prediksi harga komoditas secara interaktif.
@@ -15,11 +15,3 @@ Tujuan utama aplikasi ini adalah untuk membantu analisis dan visualisasi perform
 - 🖥️ Tampilan interaktif berbasis **Streamlit**
 
 ---
-
-## 🧩 **Struktur Folder**
-📂 streamlit-tsvr-app/
-┣ 📜 app.py ← File utama aplikasi Streamlit
-┣ 📜 requirements.txt ← Daftar library yang dibutuhkan
-┣ 📜 tsvr.py ← Implementasi metode TwinSVR
-┣ 📂 data/ ← Dataset
-┗ 📜 README.md ← Dokumentasi proyek
