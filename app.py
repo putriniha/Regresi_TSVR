@@ -180,6 +180,8 @@ def main():
 
         X_train = df_train[feature_cols]
         y_train = df_train['Harga'].values.reshape(-1, 1)
+        X_test = df_test[feature_cols]
+        y_test = df_test['Harga'].values.reshape(-1, 1)
 
         scaler_X = StandardScaler()
         scaler_y = StandardScaler()
@@ -196,10 +198,6 @@ def main():
     selected_model = st.session_state.selected_model
 
     st.subheader(f"⚙️ Pengujian Skenario: {selected_model}")
-    kernel_choice = None
-    if selected_model in ["Support Vector Regression (SVR)", "Twin Support Vector Regression (TSVR)"]:
-        kernel_choice = st.radio("Pilih Kernel:", ["rbf", "linear", "poly", "sigmoid"], index=0, horizontal=True)
-
     if st.button("🚀 Jalankan Semua Skenario"):
         results = []
 
@@ -219,12 +217,11 @@ def main():
                 {"C1": 100,  "C2": 10,   "gamma": 0.1}
             ]
             for params in param_grid:
-                model = TwinSVR(**params, kernel=kernel_choice)
+                model = TwinSVR(**params, kernel="rbf")
                 model.fit(X_train, y_train)
                 res = evaluate_model(model, feature_cols, scaler_X, scaler_y, df_test)
                 if res:
                     res.update(params)
-                    res["kernel"] = kernel_choice
                     results.append(res)
 
         elif selected_model == "Support Vector Regression (SVR)":
@@ -239,12 +236,11 @@ def main():
                 {"C": 10,  "epsilon": 0.1, "gamma": 10}
             ]
             for params in scenarios:
-                model = SVR(**params, kernel=kernel_choice)
+                model = SVR(**params, kernel="rbf")
                 model.fit(X_train, y_train)
                 res = evaluate_model(model, feature_cols, scaler_X, scaler_y, df_test)
                 if res:
                     res.update(params)
-                    res["kernel"] = kernel_choice
                     results.append(res)
 
         else:  # Random Forest
@@ -274,6 +270,7 @@ def main():
 
         best = df_results_sorted.iloc[0]
         st.success(f"🔥 Skenario Terbaik dengan MAPE {best['MAPE']:.2f}%")
+        best["Pred"] = best["Pred"]
         df_pred_best = best["Pred"]
 
         # Visualisasi hasil terbaik
