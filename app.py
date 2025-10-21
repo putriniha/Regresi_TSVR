@@ -216,7 +216,7 @@ def main():
         ]
         selected_params = st.selectbox(
             "Pilih Skenario TSVR",
-            options=[f"Skenario {i + 1}: {params}" for i, params in enumerate(param_grid)]
+            options=[f"{params}" for i, params in enumerate(param_grid)]
         )
         index = int(selected_params.split(":")[0].split()[-1]) - 1
         params = param_grid[index]
@@ -235,7 +235,7 @@ def main():
         ]
         selected_params = st.selectbox(
             "Pilih Skenario SVR",
-            options=[f"Skenario {i + 1}: {params}" for i, params in enumerate(scenarios)]
+            options=[f"{params}" for i, params in enumerate(scenarios)]
         )
         index = int(selected_params.split(":")[0].split()[-1]) - 1
         params = scenarios[index]
@@ -255,7 +255,7 @@ def main():
         ]
         selected_params = st.selectbox(
             "Pilih Skenario Random Forest",
-            options=[f"Skenario {i + 1}: {params}" for i, params in enumerate(rf_scenarios)]
+            options=[f"{params}" for i, params in enumerate(rf_scenarios)]
         )
         index = int(selected_params.split(":")[0].split()[-1]) - 1
         params = rf_scenarios[index]
