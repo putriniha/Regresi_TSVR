@@ -155,7 +155,7 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
 # 📦 MAIN APP
 # =============================
 def main():
-    st.set_page_config(page_title="📈 Dashboard Prediksi Harga Jagung", layout="wide")
+    st.set_page_config(page_title="📈 Prediksi Harga Jagung", layout="wide")
     add_custom_css()
 
     st.title("📈 Prediksi Harga Konsumen Jagung - Kabupaten Sampang")
