@@ -19,6 +19,10 @@ def add_custom_css():
     .main { background-color: #fff5f7; }
     .stSidebar { background-color: #ffe6eb; }
     h1, h2, h3, h4 { color: #b03060; }
+    p, label, div, span {
+        font-size: 14px !important;
+        color: #333333;
+    }
     .metric-card {
         background-color: #ffe6eb;
         border-radius: 15px;
@@ -27,11 +31,22 @@ def add_custom_css():
         text-align: center;
         box-shadow: 0px 2px 5px rgba(176, 48, 96, 0.2);
     }
-    .metric-label { color: #800040; font-weight: bold; }
-    .metric-value { color: #b03060; font-size: 22px; font-weight: bold; }
+    .metric-label { color: #800040; font-weight: bold; font-size: 14px; }
+    .metric-value { color: #b03060; font-size: 18px; font-weight: bold; }
+    .stRadio > label, .stSelectbox > label, .stMarkdown p {
+        font-size: 14px !important;
+        color: #800040 !important;
+        font-weight: 600;
+    }
+    .stMarkdown code {
+        background-color: #ffe6eb;
+        color: #800040;
+        padding: 3px 6px;
+        border-radius: 5px;
+        font-size: 13px;
+    }
     </style>
     """, unsafe_allow_html=True)
-
 
 # =============================
 # 📊 Fungsi Prediksi & Evaluasi
@@ -75,18 +90,27 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
 
     if not df_eval.empty:
         errors = df_eval["Aktual"] - df_eval["Prediksi"]
+       # --- Hitung metrik evaluasi
         mape = mean_absolute_percentage_error(df_eval["Aktual"], df_eval["Prediksi"]) * 100
         mse = mean_squared_error(df_eval["Aktual"], df_eval["Prediksi"])
         r2 = r2_score(df_eval["Aktual"], df_eval["Prediksi"])
+        sse = np.sum(np.square(errors))
+        error_var = np.var(errors, ddof=1)  # ddof=1 agar sesuai dengan var sampel
 
         # --- Card Metrik
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f"<div class='metric-card'><div class='metric-label'>MAPE</div><div class='metric-value'>{mape:.2f}%</div></div>", unsafe_allow_html=True)
         with col2:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>MSE</div><div class='metric-value'>{mse:.3f}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>MSE</div><div class='metric-value'>{mse:,.3f}</div></div>", unsafe_allow_html=True)
         with col3:
             st.markdown(f"<div class='metric-card'><div class='metric-label'>R²</div><div class='metric-value'>{r2:.3f}</div></div>", unsafe_allow_html=True)
+
+        col4, col5 = st.columns(2)
+        with col4:
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>SSE</div><div class='metric-value'>{sse:,.3f}</div></div>", unsafe_allow_html=True)
+        with col5:
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>Error Variance</div><div class='metric-value'>{error_var:,.3f}</div></div>", unsafe_allow_html=True)
 
         # --- Grafik di bawah metrik
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -99,8 +123,32 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
 
         st.markdown("#### 📅 Data Prediksi dan Aktual")
         st.dataframe(df_pred)
+       # --- Tambahkan rata-rata prediksi dan aktual selama 1 minggu
+    avg_pred = df_pred["Prediksi"].mean()
+    avg_actual = df_pred["Aktual"].mean() if "Aktual" in df_pred.columns else None
+
+# --- Tampilkan dua metrik berdampingan
+    if avg_actual is not None:
+        st.markdown(f"""
+        <div style='display: flex; justify-content: center; gap: 40px; margin-top: 20px;'>
+            <div class='metric-card' style='width: 45%;'>
+                <div class='metric-label'>📊 Rata-rata Prediksi Harga (1–7 Januari 2025)</div>
+                <div class='metric-value'>Rp {avg_pred:,.0f}</div>
+            </div>
+            <div class='metric-card' style='width: 45%;'>
+                <div class='metric-label'>💰 Rata-rata Aktual Harga (1–7 Januari 2025)</div>
+                <div class='metric-value'>Rp {avg_actual:,.0f}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.info("Tidak ada data aktual Januari 2025 untuk evaluasi.")
+        # Jika tidak ada kolom 'Aktual', tampilkan hanya prediksi
+        st.markdown(f"""
+        <div class='metric-card' style='width: 50%; margin: 20px auto;'>
+            <div class='metric-label'>📊 Rata-rata Prediksi Harga (1–7 Januari 2025)</div>
+            <div class='metric-value'>Rp {avg_pred:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # =============================
@@ -116,50 +164,91 @@ def main():
     # --- Load Data
     @st.cache_data
     def load_data():
-       # === 1️⃣ Path Data ===
+        # === 1️⃣ Path Data ===
         local_train = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_train.csv"
         local_test  = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_test.csv"
-        
+
         repo_train = os.path.join("data", "data_train.csv")
         repo_test  = os.path.join("data", "data_test.csv")
-        
-        # === 2️⃣ Baca File Data ===
-        if os.path.exists(local_train):
+
+        # === 2️⃣ Baca File Data (prioritaskan lokal, kalau tidak ada pakai repo) ===
+        if os.path.exists(local_train) and os.path.exists(local_test):
             df_train = pd.read_csv(local_train)
             df_test  = pd.read_csv(local_test)
-            print("📂 Menggunakan data dari lokal")
-        else:
+            st.write("📂 Menggunakan data dari lokal")
+        elif os.path.exists(repo_train) and os.path.exists(repo_test):
             df_train = pd.read_csv(repo_train)
             df_test  = pd.read_csv(repo_test)
-            print("☁️ Menggunakan data dari GitHub/Streamlit Cloud")
+            st.write("☁️ Menggunakan data dari folder `data/` (repo)")
+        else:
+            st.error(
+                "File data_train.csv atau data_test.csv tidak ditemukan di path lokal maupun folder `data/`.\n"
+                "Pastikan file tersedia dan path sudah benar."
+            )
+            # Kembalikan struktur kosong agar app tidak crash lebih lanjut
+            return np.empty((0, 5)), np.empty((0,)), np.empty((0, 5)), np.empty((0,)), None, None, pd.DataFrame(), []
 
+        # Hapus kolom pasar yang tidak diperlukan jika ada, lalu seragamkan nama kolom Harga
         drop_cols = ['Pasar Rongtengah', 'Pasar Srimangunan', ' Pasar Rongtengah', ' Pasar Srimangunan']
-        df_train = df_train.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga'})
-        df_test = df_test.drop(columns=drop_cols, errors="ignore").rename(columns={' Rata-rata': 'Harga'})
+        df_train = df_train.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga', ' Rata-rata': 'Harga'})
+        df_test  = df_test.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga', ' Rata-rata': 'Harga'})
 
-        for df in [df_train, df_test]:
-            df["Harga"] = df["Harga"].astype(str).str.replace("Rp", "").str.replace(".", "").astype(float)
-            df["Tanggal"] = pd.to_datetime(df["Tanggal"])
+        # === 3️⃣ Bersihkan kolom Harga dan Tanggal untuk tiap dataframe ===
+        def clean_df(df):
+            # pastikan kolom Harga dan Tanggal ada
+            if "Harga" not in df.columns or "Tanggal" not in df.columns:
+                raise ValueError("Kolom 'Harga' atau 'Tanggal' tidak ditemukan di file CSV.")
+
+            # Ubah ke string, bersihkan karakter umum, hapus spasi tak terlihat
+            df["Harga"] = df["Harga"].astype(str).str.replace("Rp", "", regex=False)
+            # Hilangkan titik, koma, spasi, strip, dan karakter lain yang umum
+            df["Harga"] = df["Harga"].str.replace(".", "", regex=False).str.replace(",", "", regex=False).str.replace("\u00A0", "", regex=True).str.replace("-", "", regex=False).str.strip()
+
+            # Konversi aman ke numeric (nilai tidak valid -> NaN)
+            df["Harga"] = pd.to_numeric(df["Harga"], errors="coerce")
+
+            # Konversi Tanggal dengan coercion, hapus baris tanpa tanggal atau harga valid
+            df["Tanggal"] = pd.to_datetime(df["Tanggal"], errors="coerce")
+            df = df.dropna(subset=["Harga", "Tanggal"]).copy()
+            df.reset_index(drop=True, inplace=True)
+
+            # Tambah fitur tanggal
             df["Hari"] = df["Tanggal"].dt.day
             df["Bulan"] = df["Tanggal"].dt.month
             df["Tahun"] = df["Tanggal"].dt.year
             df["HariKe"] = df["Tanggal"].dt.dayofyear
             df["HariMinggu"] = df["Tanggal"].dt.dayofweek
 
-        feature_cols = ['Hari', 'Bulan', 'Tahun', 'HariKe', 'HariMinggu']
-        X_train = df_train[feature_cols]
-        y_train = df_train["Harga"].values.reshape(-1, 1)
-        X_test = df_test[feature_cols]
-        y_test = df_test["Harga"].values.reshape(-1, 1)
+            return df
 
+        try:
+            df_train = clean_df(df_train)
+            df_test  = clean_df(df_test)
+        except Exception as e:
+            st.error(f"Gagal membersihkan data: {e}")
+            return np.empty((0, 5)), np.empty((0,)), np.empty((0, 5)), np.empty((0,)), None, None, pd.DataFrame(), []
+
+        # === 4️⃣ Siapkan fitur dan target ===
+        feature_cols = ['Hari', 'Bulan', 'Tahun', 'HariKe', 'HariMinggu']
+        X_train = df_train[feature_cols].copy()
+        y_train = df_train["Harga"].values.reshape(-1, 1)
+        X_test  = df_test[feature_cols].copy()
+        y_test  = df_test["Harga"].values.reshape(-1, 1)
+
+        # === 5️⃣ Normalisasi (StandardScaler) ===
         scaler_X = StandardScaler()
         scaler_y = StandardScaler()
+
         X_train_scaled = scaler_X.fit_transform(X_train)
+        # fit_transform but tetap simpan scaler_y untuk inverse later
         y_train_scaled = scaler_y.fit_transform(y_train).ravel()
 
-        return X_train_scaled, y_train_scaled, X_test, y_test, scaler_X, scaler_y, df_test, feature_cols
+        # Kita juga sediakan X_test_scaled (opsional) jika mau digunakan nanti
+        X_test_scaled = scaler_X.transform(X_test)
 
-    X_train, y_train, X_test, y_test, scaler_X, scaler_y, df_test, feature_cols = load_data()
+        return X_train_scaled, y_train_scaled, X_test_scaled, y_test, scaler_X, scaler_y, df_test, feature_cols
+    X_train, y_train, X_test_scaled, y_test, scaler_X, scaler_y, df_test, feature_cols = load_data()
+
 
     # --- Pilih model
     regressor = st.radio("Pilih Metode Regresi:", ["Twin Support Vector Regression (TSVR)", "Support Vector Regression (SVR)", "Random Forest Regression (RFR)"], horizontal=True)
@@ -171,17 +260,37 @@ def main():
     # --- Skenario parameter
     param_grid_tsvr = [
         {"C1": 0.01, "C2": 0.01, "gamma": 0.001},
-        {"C1": 0.1, "C2": 1.0, "gamma": 0.05},
+        {"C1": 0.1,  "C2": 1.0,  "gamma": 0.05},
+        {"C1": 0.1, "C2": 0.1, "gamma": 0.01},
+        {"C1": 0.1, "C2": 0.1, "gamma": 0.1},
         {"C1": 1.0, "C2": 1.0, "gamma": 0.1},
+        {"C1": 1.0, "C2": 1.0, "gamma": 1.0},
+        {"C1": 1.0, "C2": 10, "gamma": 0.1},
+        {"C1": 10, "C2": 10, "gamma": 0.1},
+        {"C1": 10, "C2": 10, "gamma": 1.0},
+        {"C1": 10, "C2": 1.0, "gamma": 10},
+        {"C1": 100,  "C2": 100,  "gamma": 0.01},
+        {"C1": 100,  "C2": 10,   "gamma": 0.1},
     ]
     param_grid_svr = [
         {"C": 0.1, "epsilon": 0.1, "gamma": 0.01},
+        {"C": 0.1, "epsilon": 0.1, "gamma": 0.1},
         {"C": 1.0, "epsilon": 0.1, "gamma": 0.1},
-        {"C": 10, "epsilon": 0.1, "gamma": 1.0},
+        {"C": 1.0, "epsilon": 0.1, "gamma": 1.0},
+        {"C": 10,  "epsilon": 0.1, "gamma": 0.01},
+        {"C": 10,  "epsilon": 0.1, "gamma": 0.1},
+        {"C": 10,  "epsilon": 0.1, "gamma": 1.0},
+        {"C": 10,  "epsilon": 0.1, "gamma": 10},
     ]
     rf_scenarios = [
-        {"n_estimators": 50, "max_depth": None, "random_state": 42},
+        {"n_estimators": 50,  "max_depth": None, "random_state": 42},
+        {"n_estimators": 100, "max_depth": None, "random_state": 42},
+        {"n_estimators": 200, "max_depth": None, "random_state": 42},
+        {"n_estimators": 50,  "max_depth": 5, "random_state": 42},
         {"n_estimators": 100, "max_depth": 5, "random_state": 42},
+        {"n_estimators": 200, "max_depth": 5, "random_state": 42},
+        {"n_estimators": 50,  "max_depth": 10, "random_state": 42},
+        {"n_estimators": 100, "max_depth": 10, "random_state": 42},
         {"n_estimators": 200, "max_depth": 10, "random_state": 42},
     ]
 
