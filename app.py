@@ -1,23 +1,46 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, r2_score
-from tsvr import TwinSVR  # pastikan file tsvr.py ada di folder yang sama
+from sklearn.preprocessing import StandardScaler
+from tsvr import TwinSVR
+import matplotlib.pyplot as plt
 
 
-# =====================================================
-# 🔹 FUNGSI PREDIKSI JANUARI 2025
-# =====================================================
+# =============================
+# 🎨 Tambahan CSS untuk tema pink
+# =============================
+def add_custom_css():
+    st.markdown("""
+    <style>
+    .main { background-color: #fff5f7; }
+    .stSidebar { background-color: #ffe6eb; }
+    h1, h2, h3, h4 { color: #b03060; }
+    .metric-card {
+        background-color: #ffe6eb;
+        border-radius: 15px;
+        padding: 15px;
+        margin: 10px 0;
+        text-align: center;
+        box-shadow: 0px 2px 5px rgba(176, 48, 96, 0.2);
+    }
+    .metric-label { color: #800040; font-weight: bold; }
+    .metric-value { color: #b03060; font-size: 22px; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# =============================
+# 📊 Fungsi Prediksi & Evaluasi
+# =============================
 def predict_january_2025(model, X_columns, scaler_X, scaler_y, df_test):
     start_date = pd.to_datetime("2025-01-01")
     end_date = pd.to_datetime("2025-01-07")
     date_range = pd.date_range(start=start_date, end=end_date)
-
     predictions = []
+
     for date in date_range:
         features = {
             'Hari': date.day,
@@ -26,213 +49,165 @@ def predict_january_2025(model, X_columns, scaler_X, scaler_y, df_test):
             'HariKe': date.dayofyear,
             'HariMinggu': date.weekday()
         }
-        for col in [col for col in X_columns if col.startswith('Pasar_')]:
-            features[col] = 0
-
+        
         features_df = pd.DataFrame([features])[X_columns]
         features_scaled = scaler_X.transform(features_df)
-
+        
         prediction_scaled = model.predict(features_scaled)
         if prediction_scaled.ndim > 1:
             prediction_scaled = prediction_scaled.ravel()
         prediction = scaler_y.inverse_transform(prediction_scaled.reshape(-1, 1))
-
+        
         actual_value = None
+        
         if "Tanggal" in df_test.columns and date in df_test["Tanggal"].values:
             actual_value = df_test.loc[df_test["Tanggal"] == date, "Harga"].values[0]
-
         predictions.append((date, prediction[0][0], actual_value))
 
-    df_pred = pd.DataFrame(predictions, columns=["Tanggal", "Prediksi", "Aktual"])
-    return df_pred
+    return pd.DataFrame(predictions, columns=["Tanggal", "Prediksi", "Aktual"])
 
 
-# =====================================================
-# 🔹 FUNGSI EVALUASI (VERSI BARU)
-# =====================================================
-def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test,
-                      mape_val=None, sse_val=None, mse_val=None, r2_val=None):
+def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
+    df_pred = predict_january_2025(model, feature_cols, scaler_X, scaler_y, df_test)
+    df_eval = df_pred.dropna(subset=["Aktual"])
+    st.markdown("### 🎯 Hasil Evaluasi Model")
 
-    df_pred_jan = predict_january_2025(model, feature_cols, scaler_X, scaler_y, df_test)
-
-    st.subheader("📅 Prediksi Januari 2025")
-    st.dataframe(df_pred_jan)
-
-    # --- Siapkan data aktual (df_eval)
-    df_eval = df_pred_jan.dropna(subset=["Aktual"])
     if not df_eval.empty:
-        # Hitung metrik evaluasi pada data aktual
         errors = df_eval["Aktual"] - df_eval["Prediksi"]
         mape = mean_absolute_percentage_error(df_eval["Aktual"], df_eval["Prediksi"]) * 100
-        sse = np.sum(errors ** 2)
         mse = mean_squared_error(df_eval["Aktual"], df_eval["Prediksi"])
         r2 = r2_score(df_eval["Aktual"], df_eval["Prediksi"])
-        error_variance = np.var(errors, ddof=1)  # Error variance
 
-        # --- Evaluasi hasil prediksi aktual
-        st.subheader("🎯 Evaluasi Perbandingan Data Aktual dan Prediksi Januari 2025")
-        st.markdown(f"""
-        **MAPE**           : 🧮 {mape:.2f}%  
-        **SSE**            : 🧮 {sse:.2f}  
-        **MSE**            : 🧮 {mse:.3f}  
-        **R²**             : 🧮 {r2:.3f}  
-        **Error Variance** : 🧮 {error_variance:.3f}  
-        """)
+        # --- Card Metrik
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>MAPE</div><div class='metric-value'>{mape:.2f}%</div></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>MSE</div><div class='metric-value'>{mse:.3f}</div></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>R²</div><div class='metric-value'>{r2:.3f}</div></div>", unsafe_allow_html=True)
 
-        # --- Visualisasi
+        # --- Grafik di bawah metrik
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(df_pred_jan["Tanggal"], df_pred_jan["Prediksi"], label="Prediksi", marker="o", color="#505fd4")
-        if df_pred_jan["Aktual"].notna().any():
-            ax.plot(df_pred_jan["Tanggal"], df_pred_jan["Aktual"], label="Aktual", marker="x", color="#f95d6a")
-        ax.set_title("Prediksi vs Aktual - Januari 2025", color="#3d0318")
+        ax.plot(df_pred["Tanggal"], df_pred["Prediksi"], label="Prediksi", marker="o", color="#b03060")
+        if df_pred["Aktual"].notna().any():
+            ax.plot(df_pred["Tanggal"], df_pred["Aktual"], label="Aktual", marker="x", color="#505fd4")
+        ax.set_title("Grafik Prediksi vs Aktual (Januari 2025)", color="#800040", fontsize=14)
         ax.legend()
         st.pyplot(fig)
+
+        st.markdown("#### 📅 Data Prediksi dan Aktual")
+        st.dataframe(df_pred)
     else:
-        st.info("ℹ️ Tidak ada data aktual Januari 2025 di df_test.")
+        st.info("Tidak ada data aktual Januari 2025 untuk evaluasi.")
 
 
-# =====================================================
-# 🔹 DATA SIMULASI (GANTI DENGAN DATA ASLI)
-# =====================================================
-st.title("📈 Prediksi Harga Konsumen Jagung")
+# =============================
+# 📦 MAIN APP
+# =============================
+def main():
+    st.set_page_config(page_title="📈 Dashboard Prediksi Harga Jagung", layout="wide")
+    add_custom_css()
 
-np.random.seed(42)
-tanggal = pd.date_range(start="2024-01-01", periods=30, freq="M")
-harga = np.random.randint(6000, 9000, size=30)
-df = pd.DataFrame({
-    "Tanggal": tanggal,
-    "Harga": harga,
-    "Hari": tanggal.day,
-    "Bulan": tanggal.month,
-    "Tahun": tanggal.year,
-    "HariKe": tanggal.dayofyear,
-    "HariMinggu": tanggal.weekday
-})
+    st.title("🌽 Prediksi Harga Konsumen Jagung - Kabupaten Sampang")
+    st.markdown("Aplikasi ini membandingkan **TSVR, SVR, dan RFR** dalam memprediksi harga jagung berdasarkan data historis.")
 
-feature_cols = ["Hari", "Bulan", "Tahun", "HariKe", "HariMinggu"]
-scaler_X = StandardScaler()
-scaler_y = StandardScaler()
-X = scaler_X.fit_transform(df[feature_cols])
-y = scaler_y.fit_transform(df[["Harga"]])
+    # --- Load Data
+    @st.cache_data
+    def load_data():
+       # === 1️⃣ Path Data ===
+        local_train = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_train.csv"
+        local_test  = r"D:\PUTRI\COOLYEAH\8~\BAB IV\streamlit\data\data_test.csv"
+        
+        repo_train = os.path.join("data", "data_train.csv")
+        repo_test  = os.path.join("data", "data_test.csv")
+        
+        # === 2️⃣ Baca File Data ===
+        if os.path.exists(local_train):
+            df_train = pd.read_csv(local_train)
+            df_test  = pd.read_csv(local_test)
+            print("📂 Menggunakan data dari lokal")
+        else:
+            df_train = pd.read_csv(repo_train)
+            df_test  = pd.read_csv(repo_test)
+            print("☁️ Menggunakan data dari GitHub/Streamlit Cloud")
 
-train_size = int(0.8 * len(df))
-X_train, X_test = X[:train_size], X[train_size:]
-y_train, y_test = y[:train_size], y[train_size:]
-df_train, df_test = df.iloc[:train_size], df.iloc[train_size:]
+        drop_cols = ['Pasar Rongtengah', 'Pasar Srimangunan', ' Pasar Rongtengah', ' Pasar Srimangunan']
+        df_train = df_train.drop(columns=drop_cols, errors="ignore").rename(columns={'Rata-rata': 'Harga'})
+        df_test = df_test.drop(columns=drop_cols, errors="ignore").rename(columns={' Rata-rata': 'Harga'})
 
+        for df in [df_train, df_test]:
+            df["Harga"] = df["Harga"].astype(str).str.replace("Rp", "").str.replace(".", "").astype(float)
+            df["Tanggal"] = pd.to_datetime(df["Tanggal"])
+            df["Hari"] = df["Tanggal"].dt.day
+            df["Bulan"] = df["Tanggal"].dt.month
+            df["Tahun"] = df["Tanggal"].dt.year
+            df["HariKe"] = df["Tanggal"].dt.dayofyear
+            df["HariMinggu"] = df["Tanggal"].dt.dayofweek
 
-# =====================================================
-# 🔹 SIDEBAR MODEL
-# =====================================================
-st.sidebar.title("⚙️ Pengaturan Model")
-regressor = st.sidebar.radio(
-    "Pilih Metode Regresi",
-    ("Twin Support Vector Regression (TSVR)", "Support Vector Regression (SVR)", "Random Forest Regression")
-)
+        feature_cols = ['Hari', 'Bulan', 'Tahun', 'HariKe', 'HariMinggu']
+        X_train = df_train[feature_cols]
+        y_train = df_train["Harga"].values.reshape(-1, 1)
+        X_test = df_test[feature_cols]
+        y_test = df_test["Harga"].values.reshape(-1, 1)
 
+        scaler_X = StandardScaler()
+        scaler_y = StandardScaler()
+        X_train_scaled = scaler_X.fit_transform(X_train)
+        y_train_scaled = scaler_y.fit_transform(y_train).ravel()
 
-# =====================================================
-# 🔹 TWIN SUPPORT VECTOR REGRESSION
-# =====================================================
-if regressor == "Twin Support Vector Regression (TSVR)":
-    tsvr_params = [
+        return X_train_scaled, y_train_scaled, X_test, y_test, scaler_X, scaler_y, df_test, feature_cols
+
+    X_train, y_train, X_test, y_test, scaler_X, scaler_y, df_test, feature_cols = load_data()
+
+    # --- Pilih model
+    regressor = st.radio("Pilih Metode Regresi:", ["Twin Support Vector Regression (TSVR)", "Support Vector Regression (SVR)", "Random Forest Regression (RFR)"], horizontal=True)
+
+    # --- Pilihan kernel
+    if regressor in ["Twin Support Vector Regression (TSVR)", "Support Vector Regression (SVR)"]:
+        st.radio("Pilih Jenis Kernel:", ["RBF"], horizontal=True)
+
+    # --- Skenario parameter
+    param_grid_tsvr = [
         {"C1": 0.01, "C2": 0.01, "gamma": 0.001},
-        {"C1": 0.1,  "C2": 1.0,  "gamma": 0.05},
-        {"C1": 0.1, "C2": 0.1, "gamma": 0.01},
-        {"C1": 0.1, "C2": 0.1, "gamma": 0.1},
+        {"C1": 0.1, "C2": 1.0, "gamma": 0.05},
         {"C1": 1.0, "C2": 1.0, "gamma": 0.1},
-        {"C1": 1.0, "C2": 1.0, "gamma": 1.0},
-        {"C1": 1.0, "C2": 10, "gamma": 0.1},
-        {"C1": 10, "C2": 10, "gamma": 0.1},
-        {"C1": 10, "C2": 10, "gamma": 1.0},
-        {"C1": 10, "C2": 1.0, "gamma": 10},
-        {"C1": 100,  "C2": 100,  "gamma": 0.01},
-        {"C1": 100,  "C2": 10,   "gamma": 0.1},
     ]
-
-    selected_params = st.sidebar.selectbox(
-        "🚦 Pilih kombinasi parameter TSVR",
-        tsvr_params,
-        format_func=lambda x: f"C1={x['C1']}, C2={x['C2']}, γ={x['gamma']}"
-    )
-
-    kernel = st.sidebar.radio("🎯 Kernel", ("rbf",), index=0)
-
-    if st.sidebar.button("🚀 Jalankan TSVR"):
-        model = TwinSVR(
-            C1=selected_params["C1"],
-            C2=selected_params["C2"],
-            kernel=kernel,
-            gamma=selected_params["gamma"]
-        )
-        model.fit(X_train, y_train.ravel())
-        st.subheader("📊 Hasil Twin SVR")
-        evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test)
-
-
-# =====================================================
-# 🔹 SUPPORT VECTOR REGRESSION
-# =====================================================
-elif regressor == "Support Vector Regression (SVR)":
-    svr_params = [
+    param_grid_svr = [
         {"C": 0.1, "epsilon": 0.1, "gamma": 0.01},
-        {"C": 0.1, "epsilon": 0.1, "gamma": 0.1},
         {"C": 1.0, "epsilon": 0.1, "gamma": 0.1},
-        {"C": 1.0, "epsilon": 0.1, "gamma": 1.0},
-        {"C": 10,  "epsilon": 0.1, "gamma": 0.01},
-        {"C": 10,  "epsilon": 0.1, "gamma": 0.1},
-        {"C": 10,  "epsilon": 0.1, "gamma": 1.0},
-        {"C": 10,  "epsilon": 0.1, "gamma": 10},
+        {"C": 10, "epsilon": 0.1, "gamma": 1.0},
     ]
-
-    selected_params = st.sidebar.selectbox(
-        "🚦 Pilih kombinasi parameter SVR",
-        svr_params,
-        format_func=lambda x: f"C={x['C']}, ε={x['epsilon']}, γ={x['gamma']}"
-    )
-
-    kernel = st.sidebar.radio("🎯 Kernel", ("rbf",), index=0)
-
-    if st.sidebar.button("🚀 Jalankan SVR"):
-        model = SVR(
-            C=selected_params["C"],
-            kernel=kernel,
-            gamma=selected_params["gamma"],
-            epsilon=selected_params["epsilon"]
-        )
-        model.fit(X_train, y_train.ravel())
-        st.subheader("📊 Hasil SVR")
-        evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test)
-
-
-# =====================================================
-# 🔹 RANDOM FOREST REGRESSION
-# =====================================================
-elif regressor == "Random Forest Regression":
     rf_scenarios = [
-        {"n_estimators": 50,  "max_depth": None, "random_state": 42},
-        {"n_estimators": 100, "max_depth": None, "random_state": 42},
-        {"n_estimators": 200, "max_depth": None, "random_state": 42},
-        {"n_estimators": 50,  "max_depth": 5, "random_state": 42},
+        {"n_estimators": 50, "max_depth": None, "random_state": 42},
         {"n_estimators": 100, "max_depth": 5, "random_state": 42},
-        {"n_estimators": 200, "max_depth": 5, "random_state": 42},
-        {"n_estimators": 50,  "max_depth": 10, "random_state": 42},
-        {"n_estimators": 100, "max_depth": 10, "random_state": 42},
         {"n_estimators": 200, "max_depth": 10, "random_state": 42},
     ]
 
-    selected_rf = st.sidebar.selectbox(
-        "🌲 Pilih kombinasi parameter RF",
-        rf_scenarios,
-        format_func=lambda x: f"n={x['n_estimators']}, depth={x['max_depth']}"
-    )
+    if regressor == "Twin Support Vector Regression (TSVR)":
+        scenario_options = [f"C1={p['C1']}, C2={p['C2']}, γ={p['gamma']}" for p in param_grid_tsvr]
+        selected = st.selectbox("Pilih Skenario Parameter TSVR:", scenario_options)
+        params = param_grid_tsvr[scenario_options.index(selected)]
+        model = TwinSVR(C1=params["C1"], C2=params["C2"], kernel="rbf", gamma=params["gamma"])
 
-    if st.sidebar.button("🚀 Jalankan RF"):
-        model = RandomForestRegressor(
-            n_estimators=selected_rf["n_estimators"],
-            max_depth=selected_rf["max_depth"],
-            random_state=selected_rf["random_state"]
-        )
-        model.fit(X_train, y_train.ravel())
-        st.subheader("📊 Hasil Random Forest")
+    elif regressor == "Support Vector Regression (SVR)":
+        scenario_options = [f"C={p['C']}, ε={p['epsilon']}, γ={p['gamma']}" for p in param_grid_svr]
+        selected = st.selectbox("Pilih Skenario Parameter SVR:", scenario_options)
+        params = param_grid_svr[scenario_options.index(selected)]
+        model = SVR(C=params["C"], epsilon=params["epsilon"], kernel="rbf", gamma=params["gamma"])
+
+    else:
+        scenario_options = [f"Trees={p['n_estimators']}, Depth={p['max_depth']}" for p in rf_scenarios]
+        selected = st.selectbox("Pilih Skenario Parameter RFR:", scenario_options)
+        params = rf_scenarios[scenario_options.index(selected)]
+        model = RandomForestRegressor(**params)
+
+    st.markdown(f"### 🔧 Parameter Aktif: `{params}`")
+
+    if st.button("🚀 Jalankan Model dan Tampilkan Hasil"):
+        model.fit(X_train, y_train)
         evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test)
+
+
+if __name__ == "__main__":
+    main()
