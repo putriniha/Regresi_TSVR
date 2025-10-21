@@ -20,7 +20,7 @@ def add_custom_css():
     .stSidebar { background-color: #ffe6eb; }
     h1, h2, h3, h4 { color: #b03060; }
     p, label, div, span {
-        font-size: 16px !important;
+        font-size: 18px !important;
         color: #333333;
     }
     .metric-card {
@@ -31,10 +31,10 @@ def add_custom_css():
         text-align: center;
         box-shadow: 0px 2px 5px rgba(176, 48, 96, 0.2);
     }
-    .metric-label { color: #800040; font-weight: bold; font-size: 16px; }
+    .metric-label { color: #800040; font-weight: bold; font-size: 18px; }
     .metric-value { color: #b03060; font-size: 18px; font-weight: bold; }
     .stRadio > label, .stSelectbox > label, .stMarkdown p {
-        font-size: 16px !important;
+        font-size: 18px !important;
         color: #800040 !important;
         font-weight: 600;
     }
@@ -117,7 +117,7 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
         ax.plot(df_pred["Tanggal"], df_pred["Prediksi"], label="Prediksi", marker="o", color="#b03060")
         if df_pred["Aktual"].notna().any():
             ax.plot(df_pred["Tanggal"], df_pred["Aktual"], label="Aktual", marker="x", color="#505fd4")
-        ax.set_title("Grafik Prediksi vs Aktual (Januari 2025)", color="#800040", fontsize=16)
+        ax.set_title("Grafik Prediksi vs Aktual (Januari 2025)", color="#800040", fontsize=18)
         ax.legend()
         st.pyplot(fig)
 
@@ -158,7 +158,7 @@ def main():
     st.set_page_config(page_title="📈 Dashboard Prediksi Harga Jagung", layout="wide")
     add_custom_css()
 
-    st.title("🌽 Prediksi Harga Konsumen Jagung - Kabupaten Sampang")
+    st.title("📈 Prediksi Harga Konsumen Jagung - Kabupaten Sampang")
     st.markdown("Aplikasi ini membandingkan **TSVR, SVR, dan RFR** dalam memprediksi harga jagung berdasarkan data historis.")
 
     # --- Load Data
