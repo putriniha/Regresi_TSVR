@@ -48,6 +48,7 @@ def add_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
+
 # =============================
 # 📊 Fungsi Prediksi & Evaluasi
 # =============================
@@ -82,6 +83,11 @@ def predict_january_2025(model, X_columns, scaler_X, scaler_y, df_test):
 
     return pd.DataFrame(predictions, columns=["Tanggal", "Prediksi", "Aktual"])
 
+# Fungsi untuk ubah format angka ke gaya Indonesia
+def format_indonesia(value, desimal=4):
+    if isinstance(value, (int, float)):
+        return f"{value:,.{desimal}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return value
 
 def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
     df_pred = predict_january_2025(model, feature_cols, scaler_X, scaler_y, df_test)
@@ -100,17 +106,17 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
         # --- Card Metrik
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>MAPE</div><div class='metric-value'>{mape:.2f}%</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>MAPE</div><div class='metric-value'>{format_indonesia(mape, 2)}%</div></div>", unsafe_allow_html=True)
         with col2:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>MSE</div><div class='metric-value'>{mse:,.3f}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>MSE</div><div class='metric-value'>{format_indonesia(mse, 4)}</div></div>", unsafe_allow_html=True)
         with col3:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>R²</div><div class='metric-value'>{r2:.3f}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>R²</div><div class='metric-value'>{format_indonesia(r2, 4)}</div></div>", unsafe_allow_html=True)
 
         col4, col5 = st.columns(2)
         with col4:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>SSE</div><div class='metric-value'>{sse:,.3f}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>SSE</div><div class='metric-value'>{format_indonesia(sse, 4)}</div></div>", unsafe_allow_html=True)
         with col5:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>Error Variance</div><div class='metric-value'>{error_var:,.3f}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>Error Variance</div><div class='metric-value'>{format_indonesia(error_var, 4)}</div></div>", unsafe_allow_html=True)
 
         # --- Grafik di bawah metrik
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -122,7 +128,14 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
         st.pyplot(fig)
 
         st.markdown("#### 📅 Data Prediksi dan Aktual")
-        st.dataframe(df_pred)
+        # Buat salinan agar df_pred aslinya tetap bersih
+        df_tampil = df_pred.copy()
+
+        # Pilih kolom yang ingin diformat (misal Prediksi dan Aktual)
+        df_tampil[["Prediksi", "Aktual"]] = df_tampil[["Prediksi", "Aktual"]].applymap(lambda x: format_indonesia(x, 2))
+
+        # Tampilkan dataframe dengan format Indonesia
+        st.dataframe(df_tampil)
        # --- Tambahkan rata-rata prediksi dan aktual selama 1 minggu
     avg_pred = df_pred["Prediksi"].mean()
     avg_actual = df_pred["Aktual"].mean() if "Aktual" in df_pred.columns else None
@@ -133,11 +146,11 @@ def evaluate_forecast(model, feature_cols, scaler_X, scaler_y, df_test):
         <div style='display: flex; justify-content: center; gap: 40px; margin-top: 20px;'>
             <div class='metric-card' style='width: 45%;'>
                 <div class='metric-label'>📊 Rata-rata Prediksi Harga (1–7 Januari 2025)</div>
-                <div class='metric-value'>Rp {avg_pred:,.0f}</div>
+                <div class='metric-value'>Rp {format_indonesia(avg_pred, 0)}</div>
             </div>
             <div class='metric-card' style='width: 45%;'>
                 <div class='metric-label'>💰 Rata-rata Aktual Harga (1–7 Januari 2025)</div>
-                <div class='metric-value'>Rp {avg_actual:,.0f}</div>
+                <div class='metric-value'>Rp {format_indonesia(avg_actual,0)}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
